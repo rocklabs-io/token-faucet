@@ -9,6 +9,7 @@
 import HashMap "mo:base/HashMap";
 import Array "mo:base/Array";
 import Nat "mo:base/Nat";
+import Nat64 "mo:base/Nat64";
 import Hash "mo:base/Hash";
 import Error "mo:base/Error";
 import Principal "mo:base/Principal";
@@ -19,15 +20,15 @@ import Cycles = "mo:base/ExperimentalCycles";
 shared(msg) actor class Faucet() = this {
 
     public type TokenActor = actor {
-        allowance: shared (owner: Principal, spender: Principal) -> async Nat;
-        approve: shared (spender: Principal, value: Nat) -> async Bool;
-        balanceOf: (owner: Principal) -> async Nat;
-        decimals: () -> async Nat;
+        allowance: shared (owner: Principal, spender: Principal) -> async Nat64;
+        approve: shared (spender: Principal, value: Nat64) -> async Bool;
+        balanceOf: (owner: Principal) -> async Nat64;
+        decimals: () -> async Nat64;
         name: () -> async Text;
         symbol: () -> async Text;
-        totalSupply: () -> async Nat;
-        transfer: shared (to: Principal, value: Nat) -> async Bool;
-        transferFrom: shared (from: Principal, to: Principal, value: Nat) -> async Bool;
+        totalSupply: () -> async Nat64;
+        transfer: shared (to: Principal, value: Nat64) -> async Bool;
+        transferFrom: shared (from: Principal, to: Principal, value: Nat64) -> async Bool;
     };
 
     private stable var owner: Principal = msg.caller;
@@ -35,19 +36,19 @@ shared(msg) actor class Faucet() = this {
     public type Stats = {
         owner: Principal;
         cycles: Nat;
-        tokenPerUser: Nat;
-        recordEntries: [(Principal, [(Principal, Nat)])];
+        tokenPerUser: Nat64;
+        recordEntries: [(Principal, [(Principal, Nat64)])];
     };
 
-    private stable var tokenPerUser: Nat = 10;
+    private stable var tokenPerUser: Nat64 = 10;
 
-    private stable var recordEntries : [(Principal, [(Principal, Nat)])] = [];
+    private stable var recordEntries : [(Principal, [(Principal, Nat64)])] = [];
     // User => Token => Amount
-    private var records = HashMap.HashMap<Principal, HashMap.HashMap<Principal, Nat>>(1, Principal.equal, Principal.hash);
+    private var records = HashMap.HashMap<Principal, HashMap.HashMap<Principal, Nat64>>(1, Principal.equal, Principal.hash);
 
-    private func _getRecordEntries(): [(Principal, [(Principal, Nat)])] {
+    private func _getRecordEntries(): [(Principal, [(Principal, Nat64)])] {
         var size : Nat = records.size();
-        var temp : [var (Principal, [(Principal, Nat)])] = Array.init<(Principal, [(Principal, Nat)])>(size, (owner, []));
+        var temp : [var (Principal, [(Principal, Nat64)])] = Array.init<(Principal, [(Principal, Nat64)])>(size, (owner, []));
         size := 0;
         for ((k, v) in records.entries()) {
             temp[size] := (k, Iter.toArray(v.entries()));
@@ -62,13 +63,13 @@ shared(msg) actor class Faucet() = this {
 
     system func postupgrade() {
         for ((k, v) in recordEntries.vals()) {
-            let record_temp = HashMap.fromIter<Principal, Nat>(v.vals(), 1, Principal.equal, Principal.hash);
+            let record_temp = HashMap.fromIter<Principal, Nat64>(v.vals(), 1, Principal.equal, Principal.hash);
             records.put(k, record_temp);
         };
         recordEntries := [];
     };
 
-    private func _record(user: Principal, token: Principal) : Nat {
+    private func _record(user: Principal, token: Principal) : Nat64 {
         switch(records.get(user)) {
             case (?user_record) {
                 switch(user_record.get(token)) {
@@ -90,7 +91,7 @@ shared(msg) actor class Faucet() = this {
         };
     };
 
-    public shared(msg) func setTokenPerUser(amount: Nat) {
+    public shared(msg) func setTokenPerUser(amount: Nat64) {
         assert(msg.caller == owner);
         tokenPerUser := amount;
     };
@@ -102,7 +103,7 @@ shared(msg) actor class Faucet() = this {
         };
         // add record
         if (Option.isNull(records.get(msg.caller))) {
-            var temp = HashMap.HashMap<Principal, Nat>(1, Principal.equal, Principal.hash);
+            var temp = HashMap.HashMap<Principal, Nat64>(1, Principal.equal, Principal.hash);
             temp.put(token_id, tokenPerUser);
             records.put(msg.caller, temp);
         } else {
@@ -112,7 +113,7 @@ shared(msg) actor class Faucet() = this {
         };
         // transfer token to msg.caller
         let token: TokenActor = actor(Principal.toText(token_id));
-        let decimals: Nat = await token.decimals();
+        let decimals: Nat64 = await token.decimals();
         return await token.transfer(msg.caller, tokenPerUser * 10**decimals);
     };
 }
