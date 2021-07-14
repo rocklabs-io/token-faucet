@@ -1,0 +1,19 @@
+{
+  "canisters": {
+    "faucet": {
+      "main": "src/faucet.mo"
+    }
+  },
+  "defaults": {
+    "build": {
+      "packtool": ""
+    }
+  },
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:8000",
+      "type": "ephemeral"
+    }
+  },
+  "version": 1
+}
