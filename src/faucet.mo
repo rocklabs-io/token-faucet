@@ -1,0 +1,118 @@
+/**
+ * Module     : registry.mo
+ * Copyright  : 2021 DFinance Team
+ * License    : Apache 2.0 with LLVM Exception
+ * Maintainer : DFinance Team <hello@dfinance.ai>
+ * Stability  : Experimental
+ */
+
+import HashMap "mo:base/HashMap";
+import Array "mo:base/Array";
+import Nat "mo:base/Nat";
+import Hash "mo:base/Hash";
+import Error "mo:base/Error";
+import Principal "mo:base/Principal";
+import Iter "mo:base/Iter";
+import Option "mo:base/Option";
+import Cycles = "mo:base/ExperimentalCycles";
+
+shared(msg) actor class Faucet() = this {
+
+    public type TokenActor = actor {
+        allowance: shared (owner: Principal, spender: Principal) -> async Nat;
+        approve: shared (spender: Principal, value: Nat) -> async Bool;
+        balanceOf: (owner: Principal) -> async Nat;
+        decimals: () -> async Nat;
+        name: () -> async Text;
+        symbol: () -> async Text;
+        totalSupply: () -> async Nat;
+        transfer: shared (to: Principal, value: Nat) -> async Bool;
+        transferFrom: shared (from: Principal, to: Principal, value: Nat) -> async Bool;
+    };
+
+    private stable var owner: Principal = msg.caller;
+
+    public type Stats = {
+        owner: Principal;
+        cycles: Nat;
+        tokenPerUser: Nat;
+        recordEntries: [(Principal, [(Principal, Nat)])];
+    };
+
+    private stable var tokenPerUser: Nat = 10;
+
+    private stable var recordEntries : [(Principal, [(Principal, Nat)])] = [];
+    // User => Token => Amount
+    private var records = HashMap.HashMap<Principal, HashMap.HashMap<Principal, Nat>>(1, Principal.equal, Principal.hash);
+
+    private func _getRecordEntries(): [(Principal, [(Principal, Nat)])] {
+        var size : Nat = records.size();
+        var temp : [var (Principal, [(Principal, Nat)])] = Array.init<(Principal, [(Principal, Nat)])>(size, (owner, []));
+        size := 0;
+        for ((k, v) in records.entries()) {
+            temp[size] := (k, Iter.toArray(v.entries()));
+            size += 1;
+        };
+        return Array.freeze(temp);
+    };
+
+    system func preupgrade() {
+        recordEntries := _getRecordEntries();
+    };
+
+    system func postupgrade() {
+        for ((k, v) in recordEntries.vals()) {
+            let record_temp = HashMap.fromIter<Principal, Nat>(v.vals(), 1, Principal.equal, Principal.hash);
+            records.put(k, record_temp);
+        };
+        recordEntries := [];
+    };
+
+    private func _record(user: Principal, token: Principal) : Nat {
+        switch(records.get(user)) {
+            case (?user_record) {
+                switch(user_record.get(token)) {
+                    case (?amount) { return amount; };
+                    case (_) { return 0; };
+                }
+            };
+            case (_) { return 0; };
+        }
+    };
+
+    public shared(msg) func getStats(): async Stats {
+        // assert(msg.caller == owner);
+        return {
+            owner = owner;
+            cycles = Cycles.balance();
+            tokenPerUser = tokenPerUser;
+            recordEntries = _getRecordEntries();
+        };
+    };
+
+    public shared(msg) func setTokenPerUser(amount: Nat) {
+        assert(msg.caller == owner);
+        tokenPerUser := amount;
+    };
+
+    public shared(msg) func getToken(token_id: Principal): async Bool {
+        let amount = _record(msg.caller, token_id);
+        if (amount >= tokenPerUser) {
+            return false;
+        };
+        // add record
+        if (Option.isNull(records.get(msg.caller))) {
+            var temp = HashMap.HashMap<Principal, Nat>(1, Principal.equal, Principal.hash);
+            temp.put(token_id, tokenPerUser);
+            records.put(msg.caller, temp);
+        } else {
+            let record_caller = Option.unwrap(records.get(msg.caller));
+            record_caller.put(token_id, tokenPerUser);
+            records.put(msg.caller, record_caller);
+        };
+        // transfer token to msg.caller
+        let token: TokenActor = actor(Principal.toText(token_id));
+        let decimals: Nat = await token.decimals();
+        return await token.transfer(msg.caller, tokenPerUser * 10**decimals);
+    };
+}
