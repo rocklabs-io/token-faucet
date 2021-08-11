@@ -16,7 +16,7 @@ import Iter "mo:base/Iter";
 import Option "mo:base/Option";
 import Cycles = "mo:base/ExperimentalCycles";
 
-shared(msg) actor class Faucet() = this {
+shared(msg) actor class Faucet(_owner: Principal) = this {
 
     public type TokenActor = actor {
         allowance: shared (owner: Principal, spender: Principal) -> async Nat;
@@ -30,7 +30,7 @@ shared(msg) actor class Faucet() = this {
         transferFrom: shared (from: Principal, to: Principal, value: Nat) -> async Bool;
     };
 
-    private stable var owner: Principal = msg.caller;
+    private stable var owner: Principal = _owner;
 
     public type Stats = {
         owner: Principal;
