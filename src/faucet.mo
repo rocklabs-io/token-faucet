@@ -98,9 +98,9 @@ shared(msg) actor class Faucet(_owner: Principal) = this {
     public query func claimed(token_id: Principal, a: Principal): async Bool {
         let amount = _record(msg.caller, token_id);
         if (amount >= tokenPerUser) {
-            return false;
+            return true;
         };
-        return true;
+        return false;
     };
 
     public shared(msg) func getToken(token_id: Principal): async Bool {
