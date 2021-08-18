@@ -36,10 +36,11 @@ shared(msg) actor class Faucet(_owner: Principal) = this {
         owner: Principal;
         cycles: Nat;
         tokenPerUser: Nat;
-        recordEntries: [(Principal, [(Principal, Nat)])];
+        userNumber: Nat;
+        // recordEntries: [(Principal, [(Principal, Nat)])];
     };
 
-    private stable var tokenPerUser: Nat = 10;
+    private stable var tokenPerUser: Nat = 100;
 
     private stable var recordEntries : [(Principal, [(Principal, Nat)])] = [];
     // User => Token => Amount
@@ -86,8 +87,14 @@ shared(msg) actor class Faucet(_owner: Principal) = this {
             owner = owner;
             cycles = Cycles.balance();
             tokenPerUser = tokenPerUser;
-            recordEntries = _getRecordEntries();
+            userNumber = records.size();
+            // recordEntries = _getRecordEntries();
         };
+    };
+
+    public shared(msg) func getRecords(): async [(Principal, [(Principal, Nat)])] {
+        assert(msg.caller == owner);
+        _getRecordEntries()
     };
 
     public shared(msg) func setTokenPerUser(amount: Nat) {
@@ -96,7 +103,7 @@ shared(msg) actor class Faucet(_owner: Principal) = this {
     };
 
     public query func claimed(token_id: Principal, a: Principal): async Bool {
-        let amount = _record(msg.caller, token_id);
+        let amount = _record(a, token_id);
         if (amount >= tokenPerUser) {
             return true;
         };
