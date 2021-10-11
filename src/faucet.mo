@@ -14,7 +14,8 @@ import Error "mo:base/Error";
 import Principal "mo:base/Principal";
 import Iter "mo:base/Iter";
 import Option "mo:base/Option";
-import Cycles = "mo:base/ExperimentalCycles";
+import Cycles "mo:base/ExperimentalCycles";
+import Nat8 "mo:base/Nat8";
 
 shared(msg) actor class Faucet(_owner: Principal) = this {
 
@@ -22,7 +23,7 @@ shared(msg) actor class Faucet(_owner: Principal) = this {
         allowance: shared (owner: Principal, spender: Principal) -> async Nat;
         approve: shared (spender: Principal, value: Nat) -> async Bool;
         balanceOf: (owner: Principal) -> async Nat;
-        decimals: () -> async Nat;
+        decimals: () -> async Nat8;
         name: () -> async Text;
         symbol: () -> async Text;
         totalSupply: () -> async Nat;
@@ -127,7 +128,7 @@ shared(msg) actor class Faucet(_owner: Principal) = this {
         };
         // transfer token to msg.caller
         let token: TokenActor = actor(Principal.toText(token_id));
-        let decimals: Nat = await token.decimals();
-        return await token.transfer(msg.caller, tokenPerUser * 10**decimals);
+        let decimals: Nat8 = await token.decimals();
+        return await token.transfer(msg.caller, tokenPerUser * 10**Nat8.toNat(decimals));
     };
 }
