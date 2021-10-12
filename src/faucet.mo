@@ -16,19 +16,23 @@ import Iter "mo:base/Iter";
 import Option "mo:base/Option";
 import Cycles "mo:base/ExperimentalCycles";
 import Nat8 "mo:base/Nat8";
+import Result "mo:base/Result";
 
 shared(msg) actor class Faucet(_owner: Principal) = this {
-
+    type TxReceipt = Result.Result<Nat, {
+        #InsufficientBalance;
+        #InsufficientAllowance;
+    }>;
     public type TokenActor = actor {
         allowance: shared (owner: Principal, spender: Principal) -> async Nat;
-        approve: shared (spender: Principal, value: Nat) -> async Bool;
+        approve: shared (spender: Principal, value: Nat) -> async TxReceipt;
         balanceOf: (owner: Principal) -> async Nat;
         decimals: () -> async Nat8;
         name: () -> async Text;
         symbol: () -> async Text;
         totalSupply: () -> async Nat;
-        transfer: shared (to: Principal, value: Nat) -> async Bool;
-        transferFrom: shared (from: Principal, to: Principal, value: Nat) -> async Bool;
+        transfer: shared (to: Principal, value: Nat) -> async TxReceipt;
+        transferFrom: shared (from: Principal, to: Principal, value: Nat) -> async TxReceipt;
     };
 
     private stable var owner: Principal = _owner;
@@ -111,10 +115,10 @@ shared(msg) actor class Faucet(_owner: Principal) = this {
         return false;
     };
 
-    public shared(msg) func getToken(token_id: Principal): async Bool {
+    public shared(msg) func getToken(token_id: Principal): async TxReceipt {
         let amount = _record(msg.caller, token_id);
         if (amount >= tokenPerUser) {
-            return false;
+            return #err(#InsufficientAllowance);
         };
         // add record
         if (Option.isNull(records.get(msg.caller))) {
